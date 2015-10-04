@@ -12,18 +12,11 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.util.StringUtils;
-import org.thymeleaf.context.Context;
-import org.thymeleaf.context.VariablesMap;
-import org.thymeleaf.spring4.SpringTemplateEngine;
 
 import javax.mail.internet.MimeMessage;
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
 
 /**
  * @author Allan Ditzel
@@ -31,58 +24,57 @@ import java.util.Map;
  */
 @SpringBootApplication
 public class EasyMassMailer implements CommandLineRunner {
-    private static final Logger log = LoggerFactory.getLogger(EasyMassMailer.class);
-    private static final int NUMBER_OF_COLUMNS_IN_CSV_FILE = 1;
+	private static final Logger log = LoggerFactory.getLogger(EasyMassMailer.class);
+	private static final int NUMBER_OF_COLUMNS_IN_CSV_FILE = 1;
 
-    @Value("${email.input.file}")
-    private String emailFilePath;
+	@Value("${email.input.file}")
+	private String emailFilePath;
 
-    @Value("${email.template.file}")
-    private String emailTemplateFilePath;
+	@Value("${email.template.file}")
+	private String emailTemplateFilePath;
+	
+	@Value("${application.version}")
+	private String emailVersion;
 
-    @Autowired
-    private JavaMailSender mailSender;
+	@Autowired
+	private JavaMailSender mailSender;
 
-    @Autowired
-    private SpringTemplateEngine templateEngine;
+	public static void main(String[] args) {
+		SpringApplication massMailer = new SpringApplication(EasyMassMailer.class);
+		massMailer.setWebEnvironment(false);
+		massMailer.run(args);
+	}
 
-    private Context context = new Context(Locale.getDefault());
+	@Override
+	public void run(String... strings) throws Exception {
+		log.info("Reading email addresses from {}", emailFilePath);
 
-    public static void main(String[] args) {
-        SpringApplication massMailer = new SpringApplication(EasyMassMailer.class);
-        massMailer.setWebEnvironment(false);
-        massMailer.run(args);
-    }
+		Resource inputEmailsResource = new FileSystemResource(emailFilePath);
+		CSVReader reader = new CSVReader(new FileReader(inputEmailsResource.getFile()));
 
-    @Override
-    public void run(String... strings) throws Exception {
-        log.info("Reading email addresses from {}", emailFilePath);
+		String [] nextLine;
+		while ((nextLine = reader.readNext()) != null && nextLine.length == NUMBER_OF_COLUMNS_IN_CSV_FILE) {
+			String email = nextLine[0];
+			if (StringUtils.hasText(email)) {
+				log.info("Sending email to: {}", email);
+				MimeMessage mimeMessage = mailSender.createMimeMessage();
+				MimeMessageHelper message = new MimeMessageHelper(mimeMessage, "UTF-8");
+				message.setTo(email);
+				message.setFrom("tango.at.maryland@gmail.com");
+				message.setSubject("Tango Tidbits");
 
-        Resource inputEmailsResource = new FileSystemResource(emailFilePath);
-        CSVReader reader = new CSVReader(new FileReader(inputEmailsResource.getFile()));
+				BufferedReader br = new BufferedReader(new FileReader("src/main/resources/templates/tangoTidbits.html"));
+				String text = "", line;
 
-        String [] nextLine;
-        while ((nextLine = reader.readNext()) != null && nextLine.length == NUMBER_OF_COLUMNS_IN_CSV_FILE) {
-            String email = nextLine[0];
-            if (StringUtils.hasText(email)) {
-                log.info("Sending email to: {}", email);
-                MimeMessage mimeMessage = mailSender.createMimeMessage();
-                MimeMessageHelper message = new MimeMessageHelper(mimeMessage, "UTF-8");
-                message.setTo(email);
-                message.setFrom("tango.at.maryland@gmail.com");
-                message.setSubject("Tango Tidbits");
-                
-                BufferedReader br = new BufferedReader(new FileReader("src/main/resources/templates/tangoTidbits.html"));
-                String text = "", line;
-                
-                while((line = br.readLine()) != null) {
-                	text += line;
-                }
-                
-                message.setText(text, true);
-                this.mailSender.send(mimeMessage);
-                br.close();
-            }
-        }
-    }
+				while((line = br.readLine()) != null) {
+					text += line;
+				}
+
+				message.setText(text, true);
+				this.mailSender.send(mimeMessage);
+				br.close();
+			}
+		}
+		reader.close();
+	}
 }
