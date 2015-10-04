@@ -32,7 +32,7 @@ import java.util.Map;
 @SpringBootApplication
 public class EasyMassMailer implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(EasyMassMailer.class);
-    private static final int NUMBER_OF_COLUMNS_IN_CSV_FILE = 3;
+    private static final int NUMBER_OF_COLUMNS_IN_CSV_FILE = 1;
 
     @Value("${email.input.file}")
     private String emailFilePath;
@@ -63,21 +63,25 @@ public class EasyMassMailer implements CommandLineRunner {
 
         String [] nextLine;
         while ((nextLine = reader.readNext()) != null && nextLine.length == NUMBER_OF_COLUMNS_IN_CSV_FILE) {
-            String firstName = nextLine[0];
-            String lastName = nextLine[1];
-            String email = nextLine[2];
+            String email = nextLine[0];
             if (StringUtils.hasText(email)) {
                 log.info("Sending email to: {}", email);
                 MimeMessage mimeMessage = mailSender.createMimeMessage();
                 MimeMessageHelper message = new MimeMessageHelper(mimeMessage, "UTF-8");
                 message.setTo(email);
-                message.setFrom("allan@allanditzel.com");
-                message.setSubject("My awesome subject");
-                context.setVariable("firstName", firstName);
-                context.setVariable("lastName", lastName);
-                String text = this.templateEngine.process("default", context);
+                message.setFrom("tango.at.maryland@gmail.com");
+                message.setSubject("Tango Tidbits");
+                
+                BufferedReader br = new BufferedReader(new FileReader("src/main/resources/templates/tangoTidbits.html"));
+                String text = "", line;
+                
+                while((line = br.readLine()) != null) {
+                	text += line;
+                }
+                
                 message.setText(text, true);
                 this.mailSender.send(mimeMessage);
+                br.close();
             }
         }
     }
